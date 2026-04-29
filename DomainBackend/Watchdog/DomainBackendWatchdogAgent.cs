@@ -147,7 +147,11 @@ public static class DomainBackendWatchdogAgentExtensions
                 BuildInfo.GitCommit,
                 BuildInfo.BuildTimeUtc,
                 "started");
-            _ = Task.Run(() => agent.ReportStartupAsync());
+            _ = Task.Run(async () =>
+            {
+                await agent.ReportStartupAsync();
+                await agent.ReportHealthAsync("startup");
+            });
         });
 
         app.Lifetime.ApplicationStopping.Register(() =>
