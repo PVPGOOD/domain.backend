@@ -1,0 +1,6 @@
+/.idea/
+/.editorconfig
+*.DotSettings.user
+DomainBackend/App_Data/
+DomainBackend/bin/
+DomainBackend/obj/
