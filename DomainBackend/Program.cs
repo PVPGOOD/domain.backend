@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json.Serialization;
+using Domain.Backend;
 using Domain.Backend.Api.Dispatching;
 using Domain.Backend.Sql;
 using Domain.Backend.Tasks;
@@ -11,6 +12,7 @@ using Domain.Backend.Utilities.Pricing;
 using Domain.Backend.Utilities.Proxy;
 using Domain.Backend.Utilities.Rdap;
 using Domain.Backend.Utilities.Whois;
+using Domain.Backend.Watchdog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -63,9 +65,12 @@ builder.Services.AddHttpClient<IOutboundTcpRequestDispatcher, HttpProxyManagerOu
     client.BaseAddress = new Uri(proxyManagerBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+var watchdogAgent = new DomainBackendWatchdogAgent();
+builder.Services.AddDomainBackendWatchdogAgent(builder.Configuration, watchdogAgent);
 builder.Services.AddHostedService<DomainSearchWorker>();
 
 var app = builder.Build();
+app.UseDomainBackendWatchdogAgent(builder.Configuration, watchdogAgent);
 
 using (var scope = app.Services.CreateScope())
 {
@@ -76,5 +81,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapControllers();
+app.MapDomainBackendWatchdogEndpoints(builder.Configuration, watchdogAgent);
 
 await app.RunAsync();

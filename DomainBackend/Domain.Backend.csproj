@@ -6,10 +6,38 @@
         <RootNamespace>Domain.Backend</RootNamespace>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <BuildTimeUtc>$([System.DateTime]::UtcNow.ToString("O"))</BuildTimeUtc>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
     </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Domain.Watchdog\src\Domain.Watchdog.Agent\Domain.Watchdog.Agent.csproj" />
+    </ItemGroup>
+
+    <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+        <MakeDir Directories="$(IntermediateOutputPath)Generated" />
+
+        <Exec Command="git rev-parse --short=12 HEAD"
+              WorkingDirectory="$(MSBuildProjectDirectory)"
+              ConsoleToMsBuild="true"
+              IgnoreExitCode="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitFromExec" />
+        </Exec>
+
+        <PropertyGroup>
+            <GitCommit Condition="'$(GitCommitFromExec)' != ''">$(GitCommitFromExec)</GitCommit>
+            <GitCommit Condition="'$(GitCommit)' == ''">unknown</GitCommit>
+            <GeneratedBuildInfoFile>$(IntermediateOutputPath)Generated\BuildInfo.g.cs</GeneratedBuildInfoFile>
+        </PropertyGroup>
+
+        <WriteLinesToFile File="$(GeneratedBuildInfoFile)" Overwrite="true" Lines="namespace Domain.Backend%3B&#x0A;&#x0A;public static class BuildInfo&#x0A;{&#x0A;    public const string GitCommit = &quot;$(GitCommit)&quot;%3B&#x0A;    public const string BuildTimeUtc = &quot;$(BuildTimeUtc)&quot;%3B&#x0A;}" />
+
+        <ItemGroup>
+            <Compile Include="$(GeneratedBuildInfoFile)" />
+        </ItemGroup>
+    </Target>
 
 </Project>
