@@ -12,9 +12,12 @@ namespace Domain.Backend.Tasks.Search;
 
 public sealed partial class ShortBatchDomainSearchHandler(IDomainNameNormalizer normalizer) : IDomainSearchHandler
 {
-    private const int MinLength = 1;
-    private const int MaxLength = 5;
-    private const int DefaultMaxCandidates = 10_000;
+    private const int MinLength = 2;
+    private const int MaxLength = 3;
+    private const int DefaultMaxCandidates = 100_000;
+    private const string LettersCharset = "abcdefghijklmnopqrstuvwxyz";
+    private const string DigitsCharset = "123456789";
+    private const string MixedCharset = LettersCharset + DigitsCharset;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public SearchMode Mode => SearchMode.ShortBatch;
@@ -26,7 +29,7 @@ public sealed partial class ShortBatchDomainSearchHandler(IDomainNameNormalizer 
 
         if (payload.Length is < MinLength or > MaxLength)
         {
-            throw new DomainSearchValidationException("ShortBatch length must be between 1 and 5.", "payload.length");
+            throw new DomainSearchValidationException("ShortBatch length must be 2 or 3.", "payload.length");
         }
 
         if (string.IsNullOrWhiteSpace(payload.Charset) || !CharsetRegex().IsMatch(payload.Charset))
@@ -34,16 +37,18 @@ public sealed partial class ShortBatchDomainSearchHandler(IDomainNameNormalizer 
             throw new DomainSearchValidationException("Charset can only contain a-z, A-Z, or 0-9.", "payload.charset");
         }
 
+        var normalizedCharset = NormalizeCharset(payload.Charset);
+        if (normalizedCharset is not (LettersCharset or DigitsCharset or MixedCharset))
+        {
+            throw new DomainSearchValidationException("ShortBatch charset must be one of: a-z, 1-9, or a-z + 1-9.", "payload.charset");
+        }
+
         if (request.Options?.Tlds is not { Length: > 0 })
         {
             throw new DomainSearchValidationException("At least one TLD is required.", "options.tlds");
         }
 
-        var chars = payload.Charset
-            .ToLowerInvariant()
-            .Distinct()
-            .Order()
-            .ToArray();
+        var chars = normalizedCharset.ToArray();
         var tlds = request.Options.Tlds
             .Select(normalizer.NormalizeTld)
             .Distinct(StringComparer.Ordinal)
@@ -61,6 +66,15 @@ public sealed partial class ShortBatchDomainSearchHandler(IDomainNameNormalizer 
         return labels
             .SelectMany(label => tlds.Select(tld => new DomainCandidate($"{label}.{tld}", null, tld)))
             .ToArray();
+    }
+
+    private static string NormalizeCharset(string charset)
+    {
+        return new string(charset
+            .ToLowerInvariant()
+            .Distinct()
+            .Order()
+            .ToArray());
     }
 
     private static void GenerateLabels(char[] chars, int length, string prefix, List<string> labels)
